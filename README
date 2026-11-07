@@ -4,8 +4,16 @@
 - .NET 10 SDK
 
 ## Run
+
+### dotnet CLI
 dotnet restore
-dotnet run --project Dsquares.LoyaltyApi
+dotnet run --project LoyaltyApi
+
+### Docker
+docker build -t loyalty-api .
+docker run -p 5001:5001 loyalty-api
+
+The container listens on port 5001.
 
 ## Test
 dotnet test
