@@ -1,3 +1,6 @@
+using LoyaltyApi.Data;
+using LoyaltyApi.Services;
+
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
@@ -6,6 +9,9 @@ builder.Services.AddControllers();
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+
+builder.Services.AddSingleton<InMemoryStore>();
+builder.Services.AddSingleton<IAwardService, AwardService>();
 
 var app = builder.Build();
 
