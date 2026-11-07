@@ -19,5 +19,16 @@ namespace LoyaltyApi.Data
              Wallets.Add("W100", new Wallet{ WalletId = "W100", Balance = 100 });
              Wallets.Add("W200", new Wallet{ WalletId = "W200", Balance = 50 });
         }
+
+        public void Reset()
+        {
+            lock (syncRoot)
+            {
+                Wallets.Clear();
+                Awards.Clear();
+                Wallets.Add("W100", new Wallet { WalletId = "W100", Balance = 100 });
+                Wallets.Add("W200", new Wallet { WalletId = "W200", Balance = 50 });
+            }
+        }
     }
 }
