@@ -1,0 +1,34 @@
+# Dsquares Loyalty API
+
+## Requirements
+- .NET 10 SDK
+
+## Run
+dotnet restore
+dotnet run --project Dsquares.LoyaltyApi
+
+## Test
+dotnet test
+
+## Endpoints
+- POST /awards
+- GET /wallets/{walletId}
+
+## Initial data
+- W100: 100 points
+- W200: 50 points
+
+## Design
+- Award identity: (sourceId, externalTransactionId).
+- Matching retries return the original award.
+- Conflicting retries return 409.
+- One in-process lock protects award creation and balance updates.
+- Data is in memory and resets on restart.
+
+## Reset
+Use the "Wallets/Reset" Request.
+
+## Limitations
+- No persistence across restarts.
+- Lock coordinates only one process.
+- Not designed for multiple application instances.
