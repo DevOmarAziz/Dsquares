@@ -1,0 +1,15 @@
+.vs/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+*.rsuser
+*.userprefs
+
+
+bin/
+obj/
+debug/
+release/
+artifacts/
+publish/
