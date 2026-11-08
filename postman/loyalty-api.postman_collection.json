@@ -1,0 +1,345 @@
+{
+  "info": {
+    "_postman_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+    "name": "Dsquares Loyalty API",
+    "description": "Collection for the Dsquares Loyalty Award API.\n\nImport this collection together with one of the environments in `postman/environments/` and select the environment before sending requests.\n\nEndpoints:\n- POST /Awards — create a loyalty award (idempotent)\n- GET /Wallets/{walletId} — get wallet balance\n- POST /Wallets/reset — reset in-memory data to seed values (W100: 100, W200: 50)",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Awards",
+      "item": [
+        {
+          "name": "Create Award (success)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"sourceId\": \"{{sourceId}}\",\n  \"externalTransactionId\": \"{{externalTransactionId}}\",\n  \"walletId\": \"{{walletId}}\",\n  \"points\": {{points}}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/Awards",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "Awards"
+              ]
+            },
+            "description": "Creates a new award. Returns **201 Created** with the award body on first submission.\n\nAll fields are required:\n- `sourceId`, `externalTransactionId`, `walletId`: 1–64 chars, alphanumeric plus `_` and `-`\n- `points`: integer between 1 and 1000\n- `walletId` must exist (seed wallets: `W100`, `W200`) — otherwise 404\n\nRun **Reset Data** first for a clean state."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 201', () => pm.response.to.have.status(201));",
+                  "pm.test('Response has award fields', () => {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json).to.have.all.keys('awardId', 'sourceId', 'externalTransactionId', 'walletId', 'points');",
+                  "  pm.environment.set('awardId', json.awardId);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create Award (idempotent retry)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"sourceId\": \"{{sourceId}}\",\n  \"externalTransactionId\": \"{{externalTransactionId}}\",\n  \"walletId\": \"{{walletId}}\",\n  \"points\": {{points}}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/Awards",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "Awards"
+              ]
+            },
+            "description": "Repeats the previous request with the **same identity and payload** (`sourceId` + `externalTransactionId` + same `walletId` and `points`).\n\nExpected: **200 OK** returning the **original award** (same `awardId`), and the wallet balance is **not** increased again."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200 (idempotent)', () => pm.response.to.have.status(200));",
+                  "pm.test('Returns original awardId', () => {",
+                  "  const json = pm.response.json();",
+                  "  if (pm.environment.get('awardId')) {",
+                  "    pm.expect(json.awardId).to.eql(pm.environment.get('awardId'));",
+                  "  }",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create Award (conflict — reused identity, different payload)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"sourceId\": \"{{sourceId}}\",\n  \"externalTransactionId\": \"{{externalTransactionId}}\",\n  \"walletId\": \"{{conflictWalletId}}\",\n  \"points\": {{conflictPoints}}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/Awards",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "Awards"
+              ]
+            },
+            "description": "Reuses the same `sourceId` + `externalTransactionId` as a previous award but with a **different** `walletId` or `points`.\n\nExpected: **409 Conflict** with body `{ \"message\": \"This award is claimed already\" }`."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 409', () => pm.response.to.have.status(409));",
+                  "pm.test('Returns conflict message', () => {",
+                  "  pm.expect(pm.response.json().message).to.eql('This award is claimed already');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create Award (validation error)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"sourceId\": \"\",\n  \"externalTransactionId\": \"bad id!\",\n  \"walletId\": \"W100\",\n  \"points\": 0\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/Awards",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "Awards"
+              ],
+              "query": []
+            },
+            "description": "Sends an invalid payload (`sourceId` empty, `externalTransactionId` with a space, `points` out of range).\n\nExpected: **400 Bad Request** with per-field errors, e.g.:\n```json\n{\n  \"sourceId\": [\"...\"],\n  \"externalTransactionId\": [\"...\"],\n  \"points\": [\"The points must be a positive integer between 1 and 1000.\"]\n}\n```"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Returns field errors', () => {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json).to.have.property('points');",
+                  "  pm.expect(json).to.have.property('sourceId');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create Award (wallet not found)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"sourceId\": \"{{sourceId}}\",\n  \"externalTransactionId\": \"{{externalTransactionId}}-missing-wallet\",\n  \"walletId\": \"W999\",\n  \"points\": {{points}}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/Awards",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "Awards"
+              ]
+            },
+            "description": "Valid payload but `walletId` does not exist (`W999`).\n\nExpected: **404 Not Found** with body `{ \"message\": \"Wallet not found\" }`."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 404', () => pm.response.to.have.status(404));",
+                  "pm.test('Returns wallet not found', () => {",
+                  "  pm.expect(pm.response.json().message).to.eql('Wallet not found');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Wallets",
+      "item": [
+        {
+          "name": "Get Wallet Balance",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/Wallets/{{walletId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "Wallets",
+                "{{walletId}}"
+              ]
+            },
+            "description": "Returns the balance of `{{walletId}}` (default `W100`).\n\nExpected: **200 OK** with `{ \"walletId\": \"W100\", \"balance\": 100 }` (balance changes after awards)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Returns walletId and balance', () => {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json).to.have.all.keys('walletId', 'balance');",
+                  "  pm.expect(json.walletId).to.eql(pm.environment.get('walletId') || 'W100');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Wallet Balance (unknown wallet)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/Wallets/W999",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "Wallets",
+                "W999"
+              ]
+            },
+            "description": "Requests a wallet that does not exist.\n\nExpected: **404 Not Found** with an empty body."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 404', () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reset Data",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/Wallets/reset",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "Wallets",
+                "reset"
+              ]
+            },
+            "description": "Clears wallets and awards, then re-seeds the initial data:\n- `W100`: 100 points\n- `W200`: 50 points\n\nExpected: **200 OK** with an empty body. Run this before executing the award flow requests."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

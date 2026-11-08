@@ -1,5 +1,38 @@
 # Dsquares Loyalty API
 
+## Handoff
+
+### Overview
+Implemented the loyalty award API using ASP.NET Core Controllers and .NET 10. The API supports creating loyalty awards, handling idempotent requests, and retrieving wallet balances.
+
+### Key Design Decisions
+- **Idempotency:** Awards are identified by the combination of `SourceId` and `ExternalTransactionId`. Repeating a request with the same identity and payload returns the original award without adding points again. Reusing the same identity with a different wallet or points value returns a conflict.
+- **Separation of concerns:** Request validation, business logic, and HTTP response mapping are handled separately.
+- **Result handling:** `AwardResultKind` represents business outcomes independently of HTTP status codes.
+- **Concurrency:** A shared `lock` protects the in-memory award creation and wallet balance update, preventing duplicate processing within a single application instance.
+- **Storage:** An in-memory store is used to keep the implementation simple and aligned with the assignment scope.
+
+### Checks Executed
+  - Built the solution successfully.
+  - Executed the automated tests.
+  - Verified successful award creation.
+  - Verified idempotent retry behavior.
+  - Verified conflict handling for reused transaction identities with different payloads.
+  - Verified wallet balance retrieval and unknown wallet handling.
+  - Verified request validation for invalid inputs.
+  - Verified the Docker build or container startup, if performed.
+
+
+### Remaining Limitations
+- Data is stored in memory and is lost when the application restarts.
+- The `lock` provides concurrency protection only within a single application instance. A multi-instance deployment would require persistent storage and database-level transaction/uniqueness guarantees.
+- The implementation is intended for the assignment scope and does not include production-level authentication, authorization, or persistent database infrastructure.
+
+### Time Spent
+Approximately **105 minutes** for implementation and development, within the 120-minute assignment limit.
+
+AI was used as a supporting tool for planning, understanding the assignment requirements, and setting up the test project and Dockerfile. The implementation was completed independently, and the solution was reviewed and understood.
+
 ## Requirements
 - .NET 10 SDK
 
@@ -25,6 +58,42 @@ dotnet test
 ## Initial data
 - W100: 100 points
 - W200: 50 points
+
+## Postman
+
+A ready-to-import collection and environments are provided under `postman/`:
+
+- `postman/loyalty-api.postman_collection.json` — all endpoints with suitable example request bodies.
+- `postman/environments/local.postman_environment.json` — `baseUrl = http://localhost:5252` (dotnet run).
+- `postman/environments/docker.postman_environment.json` — `baseUrl = http://localhost:5001` (Docker).
+
+### Import
+1. In Postman, choose **Import** and select `postman/loyalty-api.postman_collection.json`.
+2. Import the environment that matches how you run the app (`local` or `docker`) via **Import** as well.
+3. Select the imported environment in the environment dropdown (top right).
+
+### Variables
+Change these in the selected environment instead of editing each request:
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `baseUrl` | `http://localhost:5252` | API base URL (use `http://localhost:5001` for Docker) |
+| `walletId` | `W100` | Wallet used for award creation and balance lookup |
+| `sourceId` | `SRC-1` | Award identity part 1 |
+| `externalTransactionId` | `TX-1001` | Award identity part 2 |
+| `points` | `10` | Points to award (1–1000) |
+| `conflictWalletId` | `W200` | Different wallet used to trigger a 409 conflict |
+| `conflictPoints` | `20` | Different points used to trigger a 409 conflict |
+
+### Suggested order
+1. **Wallets → Reset Data** — restores seed balances (W100: 100, W200: 50).
+2. **Awards → Create Award (success)** — expect 201 with the award body.
+3. **Awards → Create Award (idempotent retry)** — expect 200 with the same `awardId`.
+4. **Awards → Create Award (conflict…)** — expect 409.
+5. **Wallets → Get Wallet Balance** — expect 200 with the updated balance.
+6. The remaining requests cover validation errors (400) and unknown wallets (404).
+
+Each request includes tests that assert the expected status codes and response shape.
 
 ## Design
 - Award identity: (sourceId, externalTransactionId).
